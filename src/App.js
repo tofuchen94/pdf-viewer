@@ -1,43 +1,55 @@
 import { useEffect, useRef } from "react";
 import * as pdfjs from "pdfjs-dist/webpack";
+import {
+    PDFLinkService,
+    PDFViewer,
+    PDFFindController,
+    EventBus,
+    PDFScriptingManager,
+} from "pdfjs-dist/web/pdf_viewer";
+import "pdfjs-dist/web/pdf_viewer.css";
 import "./App.css";
 
 function App() {
     const canvas = useRef();
+    const viewerContainer = useRef();
     console.log(pdfjs);
     useEffect(() => {
-        const url = "test.pdf";
-        let loadingTask = pdfjs.getDocument(url);
-        loadingTask.promise.then(
-            (doc) => {
-                console.log(`Document ${url} loaded ${doc.numPages} page(s)`);
-                doc.getPage(1).then((page) => {
-                    console.log("Page loaded");
-                    console.log(doc);
-                    let scale = 1.5;
-                    let viewport = page.getViewport({ scale: scale });
-                    let context = canvas.current.getContext("2d");
-                    canvas.current.width = viewport.width;
-                    canvas.current.height = viewport.height;
-                    var renderContext = {
-                        canvasContext: context,
-                        viewport,
-                    };
-                    var renderTask = page.render(renderContext);
-                    renderTask.promise.then(function () {
-                        console.log("Page rendered");
-                    });
-                });
-            },
-            (reason) => {
-                console.error(`Error during ${url} loading: ${reason}`);
-            }
-        );
+        (async () => {
+            const url = "test.pdf";
+            const eventBus = new EventBus();
+            const linkService = new PDFLinkService({
+                eventBus,
+            });
+            const findController = new PDFFindController({
+                eventBus,
+                linkService,
+            });
+            const newViewer = new PDFViewer({
+                container: viewerContainer.current,
+                eventBus,
+                linkService,
+                findController,
+            });
+            linkService.setViewer(newViewer);
+            newViewer.currentScaleValue = "page-width";
+            let doc = await pdfjs.getDocument(url).promise;
+            let outline = await doc.getOutline();
+            console.log(outline);
+            newViewer.setDocument(doc);
+            linkService.setDocument(doc);
+        })();
     });
 
     return (
         <div className="App">
-            <canvas ref={canvas}></canvas>
+            <div
+                id="viewerContainer"
+                className="viewerContainer"
+                ref={viewerContainer}
+            >
+                <div id="viewer" className="pdfViewer"></div>
+            </div>
         </div>
     );
 }
